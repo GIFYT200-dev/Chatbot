@@ -5,7 +5,7 @@ from pymongo import MongoClient
 app = Flask(__name__)
 
 # --- Database Setup ---
-# Use the environment variable, but have a fallback for testing
+# Ensure MONGO_URI is set in your Render Environment Variables
 mongo_uri = os.environ.get("MONGO_URI")
 client = MongoClient(mongo_uri)
 db = client.chatbot_db
@@ -15,17 +15,30 @@ print("MongoDB Client Initialized")
 
 @app.route('/')
 def home():
-    return "Bot is online"
+    # This route now shows you the current message count
+    count = history_col.count_documents({})
+    return f"Bot is online! Total messages in database: {count}"
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    # Simple check to see if we can reach the DB
-    try:
-        # Just a dummy operation to see if the connection is alive
-        count = history_col.count_documents({})
-        return jsonify({"reply": f"Success! I can see {count} messages in the database."})
-    except Exception as e:
-        return jsonify({"error": f"Database connection failed: {str(e)}"}), 500
+    data = request.json
+    user_message = data.get("message", "")
+
+    if not user_message:
+        return jsonify({"error": "No message provided"}), 400
+
+    # 1. Save to MongoDB
+    chat_entry = {
+        "user_message": user_message,
+        "bot_reply": "This is a placeholder reply."
+    }
+    history_col.insert_one(chat_entry)
+
+    # 2. Return confirmation
+    return jsonify({
+        "reply": "Message saved successfully!",
+        "saved_message": user_message
+    })
 
 if __name__ == '__main__':
     app.run()
